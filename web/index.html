@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Beatbox Maker</title>
+<style>
+  :root {
+    --bg: #0e0e10;
+    --surface: #1a1a1e;
+    --surface2: #222228;
+    --border: #2e2e36;
+    --green: #1bc47d;
+    --red: #e24b4a;
+    --text: #e8e8ec;
+    --muted: #7a7a8c;
+    --accent: #1bc47d;
+    --led-off: #1e2e24;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Courier New', monospace; min-height: 100vh; }
+
+  .app { max-width: 800px; margin: 0 auto; padding: 2rem 1.5rem; }
+
+  /* HEADER */
+  .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2.5rem; }
+  .logo { font-size: 20px; font-weight: 700; letter-spacing: 0.12em; color: var(--green); }
+  .logo span { color: var(--muted); font-weight: 400; }
+  .ble-btn { display: flex; align-items: center; gap: 8px; padding: 8px 18px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--muted); font-family: inherit; font-size: 13px; cursor: pointer; transition: all 0.2s; letter-spacing: 0.05em; }
+  .ble-btn:hover { border-color: var(--green); color: var(--green); }
+  .ble-btn.connected { border-color: var(--green); color: var(--green); }
+  .ble-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
+  .ble-btn.connected .ble-dot { background: var(--green); animation: blink 2s infinite; }
+  @keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
+
+  /* SECTION */
+  .section { margin-bottom: 2rem; }
+  .section-title { font-size: 10px; letter-spacing: 0.15em; color: var(--muted); margin-bottom: 10px; text-transform: uppercase; }
+
+  /* RECORD */
+  .rec-area { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem; display: flex; align-items: center; gap: 16px; }
+  .rec-btn { display: flex; align-items: center; gap: 8px; padding: 10px 22px; background: transparent; border: 1px solid var(--border); border-radius: 6px; color: var(--muted); font-family: inherit; font-size: 13px; cursor: pointer; transition: all 0.2s; }
+  .rec-btn:hover { border-color: var(--red); color: var(--red); }
+  .rec-btn.active { border-color: var(--red); color: var(--red); animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.55;} }
+  .rec-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+  .rec-timer { font-size: 20px; font-weight: 700; color: var(--text); min-width: 60px; letter-spacing: 0.05em; }
+  .rec-status { font-size: 12px; color: var(--muted); margin-left: auto; }
+
+  /* WAVEFORM */
+  canvas#waveform { width: 100%; height: 60px; background: var(--surface2); border-radius: 6px; margin-top: 10px; display: block; }
+
+  /* SOUND LIST */
+  .sound-list { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; min-height: 80px; }
+  .sound-item { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.1s; }
+  .sound-item:last-child { border-bottom: none; }
+  .sound-item:hover { background: var(--surface2); }
+  .sound-item.selected { background: var(--surface2); border-left: 2px solid var(--green); padding-left: 14px; }
+  .snd-play { width: 28px; height: 28px; border-radius: 50%; background: transparent; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 11px; color: var(--muted); transition: all 0.15s; flex-shrink: 0; }
+  .snd-play:hover { border-color: var(--green); color: var(--green); }
+  .snd-name { flex: 1; font-size: 13px; }
+  .snd-dur { font-size: 12px; color: var(--muted); }
+  .snd-del { width: 24px; height: 24px; background: transparent; border: none; color: var(--muted); cursor: pointer; font-size: 16px; transition: color 0.15s; }
+  .snd-del:hover { color: var(--red); }
+  .empty-msg { padding: 24px; text-align: center; font-size: 13px; color: var(--muted); }
+
+  /* SLOTS */
+  .slots-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .slot { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.1rem; position: relative; transition: border-color 0.2s; }
+  .slot.active { border-color: var(--green); }
+  .slot.playing { border-color: var(--green); box-shadow: 0 0 12px rgba(27,196,125,0.15); }
+  .slot-top { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .led { width: 10px; height: 10px; border-radius: 50%; background: var(--led-off); flex-shrink: 0; transition: all 0.3s; }
+  .led.on { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .slot-num { font-size: 11px; color: var(--muted); letter-spacing: 0.1em; }
+  .slot-content { font-size: 13px; color: var(--muted); margin-bottom: 10px; min-height: 18px; }
+  .slot-content.filled { color: var(--text); }
+  .slot-actions { display: flex; gap: 8px; }
+  .slot-btn { flex: 1; padding: 7px 10px; background: transparent; border: 1px solid var(--border); border-radius: 5px; font-family: inherit; font-size: 12px; cursor: pointer; color: var(--muted); transition: all 0.15s; letter-spacing: 0.04em; }
+  .slot-btn:hover { border-color: var(--green); color: var(--green); }
+  .slot-btn.play-btn:hover { border-color: var(--green); }
+  .slot-btn.clear-btn:hover { border-color: var(--red); color: var(--red); }
+  .slot-assign { width: 100%; padding: 8px; background: transparent; border: 1px dashed var(--border); border-radius: 5px; font-family: inherit; font-size: 12px; cursor: pointer; color: var(--muted); transition: all 0.15s; letter-spacing: 0.04em; }
+  .slot-assign:hover { border-color: var(--green); color: var(--green); border-style: solid; }
+
+  /* VOLUME */
+  .vol-area { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.1rem; display: flex; align-items: center; gap: 16px; }
+  .vol-num { font-size: 22px; font-weight: 700; min-width: 52px; color: var(--green); }
+  input[type=range] { flex: 1; accent-color: var(--green); cursor: pointer; }
+  .vol-source { font-size: 11px; color: var(--muted); min-width: 40px; text-align: right; letter-spacing: 0.06em; }
+
+  /* STATUS LOG */
+  .log-area { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 0.75rem 1rem; font-size: 11px; color: var(--muted); max-height: 80px; overflow-y: auto; font-family: 'Courier New', monospace; }
+  .log-line { line-height: 1.8; }
+  .log-line.ok { color: var(--green); }
+  .log-line.err { color: var(--red); }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <div class="logo">BEATBOX<span> MAKER</span></div>
+    <button class="ble-btn" id="bleBtn" onclick="connectBLE()">
+      <span class="ble-dot" id="bleDot"></span>
+      <span id="bleLabel">BLE 연결</span>
+    </button>
+  </div>
+
+  <!-- 녹음 -->
+  <div class="section">
+    <div class="section-title">녹음</div>
+    <div class="rec-area">
+      <button class="rec-btn" id="recBtn" onclick="toggleRecord()">
+        <span class="rec-dot"></span>
+        <span id="recLabel">녹음 시작</span>
+      </button>
+      <div class="rec-timer" id="recTimer">0.0s</div>
+      <div class="rec-status" id="recStatus">마이크 대기 중</div>
+    </div>
+    <canvas id="waveform"></canvas>
+  </div>
+
+  <!-- 소리 목록 -->
+  <div class="section">
+    <div class="section-title">녹음 목록</div>
+    <div class="sound-list" id="soundList">
+      <div class="empty-msg" id="emptyMsg">녹음을 시작해서 소리를 추가하세요</div>
+    </div>
+  </div>
+
+  <!-- 슬롯 -->
+  <div class="section">
+    <div class="section-title">슬롯 배치 — LED 연동</div>
+    <div class="slots-grid" id="slotsGrid"></div>
+  </div>
+
+  <!-- 볼륨 -->
+  <div class="section">
+    <div class="section-title">볼륨 (Rich Shield 가변저항 연동)</div>
+    <div class="vol-area">
+      <div class="vol-num" id="volNum">50%</div>
+      <input type="range" id="volSlider" min="0" max="100" value="50"
+             oninput="setVolume(this.value, 'manual')">
+      <div class="vol-source" id="volSrc">수동</div>
+    </div>
+  </div>
+
+  <!-- 로그 -->
+  <div class="section">
+    <div class="section-title">BLE 로그</div>
+    <div class="log-area" id="logArea"></div>
+  </div>
+</div>
+
+<script>
+/* ───────── 상태 ───────── */
+const sounds = [];
+let selectedIdx = -1;
+const slots = [null, null, null, null];
+let recording = false;
+let recTimer = null, recSec = 0;
+let volume = 50;
+let counter = 1;
+
+/* BLE */
+let bleDevice = null, bleServer = null;
+let nusTxChar = null; /* nRF → PC (notify) */
+let nusRxChar = null; /* PC → nRF (write)  */
+const NUS_SERVICE   = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+const NUS_RX_CHAR   = '6e400002-b5a3-f393-e0a9-e50e24dcca9e'; /* write */
+const NUS_TX_CHAR   = '6e400003-b5a3-f393-e0a9-e50e24dcca9e'; /* notify */
+
+/* Web Audio */
+let audioCtx = null;
+let mediaStream = null;
+let mediaRecorder = null;
+let audioChunks = [];
+const audioBuffers = {}; /* name → AudioBuffer */
+let analyser = null;
+let animFrame = null;
+
+/* ───────── 로그 ───────── */
+function log(msg, type = '') {
+  const el = document.getElementById('logArea');
+  const line = document.createElement('div');
+  line.className = 'log-line' + (type ? ' ' + type : '');
+  const t = new Date().toLocaleTimeString('ko-KR', {hour12:false});
+  line.textContent = `[${t}] ${msg}`;
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
+}
+
+/* ───────── BLE ───────── */
+async function connectBLE() {
+  const btn = document.getElementById('bleBtn');
+  if (bleDevice && bleDevice.gatt.connected) {
+    bleDevice.gatt.disconnect();
+    return;
+  }
+  try {
+    log('BLE 스캔 중...');
+    bleDevice = await navigator.bluetooth.requestDevice({
+      filters: [{ name: 'BeatboxMaker' }],
+      optionalServices: [NUS_SERVICE],
+    });
+    bleDevice.addEventListener('gattserverdisconnected', onBLEDisconnected);
+    bleServer = await bleDevice.gatt.connect();
+    const svc = await bleServer.getPrimaryService(NUS_SERVICE);
+    nusRxChar = await svc.getCharacteristic(NUS_RX_CHAR);
+    nusTxChar = await svc.getCharacteristic(NUS_TX_CHAR);
+    await nusTxChar.startNotifications();
+    nusTxChar.addEventListener('characteristicvaluechanged', onBLENotify);
+
+    btn.classList.add('connected');
+    document.getElementById('bleLabel').textContent = 'BeatboxMaker 연결됨';
+    log('BLE 연결 성공: ' + bleDevice.name, 'ok');
+  } catch (e) {
+    log('BLE 오류: ' + e.message, 'err');
+  }
+}
+
+function onBLEDisconnected() {
+  const btn = document.getElementById('bleBtn');
+  btn.classList.remove('connected');
+  document.getElementById('bleLabel').textContent = 'BLE 연결';
+  log('BLE 연결 끊김', 'err');
+}
+
+function onBLENotify(e) {
+  const val = new TextDecoder().decode(e.target.value);
+  log('RX: ' + val);
+
+  if (val.startsWith('VOL:')) {
+    const pct = parseInt(val.split(':')[1]);
+    setVolume(pct, 'Rich Shield');
+  } else if (val.startsWith('MIC:')) {
+    /* MIC 데이터: nRF에서 ADC 샘플 스트리밍 시 처리 */
+    /* 현재는 Web Audio API로 직접 녹음하는 방식 사용 */
+  } else if (val.startsWith('LED:')) {
+    const parts = val.split(':');
+    const idx = parseInt(parts[1]) - 1;
+    const on = parts[2] === '1';
+    updateLEDUI(idx, on);
+  }
+}
+
+async function sendBLE(msg) {
+  if (!nusRxChar) return;
+  try {
+    const enc = new TextEncoder().encode(msg);
+    await nusRxChar.writeValueWithoutResponse(enc);
+    log('TX: ' + msg);
+  } catch (e) {
+    log('TX 오류: ' + e.message, 'err');
+  }
+}
+
+/* ───────── 녹음 ───────── */
+async function toggleRecord() {
+  if (!recording) {
+    await startRecord();
+  } else {
+    stopRecord();
+  }
+}
+
+async function startRecord() {
+  try {
+    audioCtx = audioCtx || new AudioContext();
+    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 256;
+    const src = audioCtx.createMediaStreamSource(mediaStream);
+    src.connect(analyser);
+
+    mediaRecorder = new MediaRecorder(mediaStream);
+    audioChunks = [];
+    mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+    mediaRecorder.onstop = finishRecord;
+    mediaRecorder.start();
+
+    recording = true;
+    recSec = 0;
+    recTimer = setInterval(() => {
+      recSec += 0.1;
+      document.getElementById('recTimer').textContent = recSec.toFixed(1) + 's';
+    }, 100);
+
+    const btn = document.getElementById('recBtn');
+    btn.classList.add('active');
+    document.getElementById('recLabel').textContent = '녹음 중지';
+    document.getElementById('recStatus').textContent = '녹음 중...';
+
+    drawWaveform();
+    sendBLE('REC:START');
+    log('녹음 시작', 'ok');
+  } catch (e) {
+    log('마이크 오류: ' + e.message, 'err');
+  }
+}
+
+function stopRecord() {
+  recording = false;
+  clearInterval(recTimer);
+  mediaRecorder && mediaRecorder.stop();
+  mediaStream && mediaStream.getTracks().forEach(t => t.stop());
+  cancelAnimationFrame(animFrame);
+
+  const btn = document.getElementById('recBtn');
+  btn.classList.remove('active');
+  document.getElementById('recLabel').textContent = '녹음 시작';
+  document.getElementById('recStatus').textContent = '처리 중...';
+  sendBLE('REC:STOP');
+}
+
+function finishRecord() {
+  const blob = new Blob(audioChunks, { type: 'audio/webm' });
+  const name = `소리 ${counter++}`;
+  const url = URL.createObjectURL(blob);
+  const dur = recSec.toFixed(1);
+
+  sounds.push({ name, url, dur, blob });
+  document.getElementById('recStatus').textContent = `저장됨: ${name}`;
+  log(`녹음 저장: ${name} (${dur}s)`, 'ok');
+  renderSoundList();
+}
+
+/* ───────── 파형 시각화 ───────── */
+function drawWaveform() {
+  const canvas = document.getElementById('waveform');
+  const ctx = canvas.getContext('2d');
+  canvas.width = canvas.offsetWidth * devicePixelRatio;
+  canvas.height = canvas.offsetHeight * devicePixelRatio;
+  ctx.scale(devicePixelRatio, devicePixelRatio);
+
+  function draw() {
+    if (!recording) { ctx.clearRect(0, 0, canvas.width, canvas.height); return; }
+    animFrame = requestAnimationFrame(draw);
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    analyser.getByteTimeDomainData(data);
+    const w = canvas.offsetWidth, h = canvas.offsetHeight;
+    ctx.clearRect(0, 0, w, h);
+    ctx.strokeStyle = '#1bc47d';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    const step = w / data.length;
+    data.forEach((v, i) => {
+      const x = i * step;
+      const y = (v / 128.0) * (h / 2);
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+  }
+  draw();
+}
+
+/* ───────── 소리 목록 ───────── */
+function renderSoundList() {
+  const list = document.getElementById('soundList');
+  list.innerHTML = '';
+  if (sounds.length === 0) {
+    list.innerHTML = '<div class="empty-msg">녹음을 시작해서 소리를 추가하세요</div>';
+    return;
+  }
+  sounds.forEach((s, i) => {
+    const item = document.createElement('div');
+    item.className = 'sound-item' + (i === selectedIdx ? ' selected' : '');
+    item.innerHTML = `
+      <button class="snd-play" onclick="previewSound(event,${i})">▶</button>
+      <span class="snd-name">${s.name}</span>
+      <span class="snd-dur">${s.dur}s</span>
+      <button class="snd-del" onclick="deleteSound(event,${i})">×</button>
+    `;
+    item.addEventListener('click', () => selectSound(i));
+    list.appendChild(item);
+  });
+}
+
+function selectSound(i) {
+  selectedIdx = i;
+  renderSoundList();
+  log(`선택: ${sounds[i].name}`);
+}
+
+const playingAudios = new Set();
+
+function previewSound(e, i) {
+  e.stopPropagation();
+  const audio = new Audio(sounds[i].url);
+  audio.volume = volume / 100;
+  playingAudios.add(audio);
+  audio.onended = () => playingAudios.delete(audio);
+  audio.play();
+}
+
+function deleteSound(e, i) {
+  e.stopPropagation();
+  URL.revokeObjectURL(sounds[i].url);
+  sounds.splice(i, 1);
+  if (selectedIdx === i) selectedIdx = -1;
+  else if (selectedIdx > i) selectedIdx--;
+  for (let s = 0; s < 4; s++) {
+    if (slots[s] && slots[s].idx === i) slots[s] = null;
+  }
+  renderSoundList();
+  renderSlots();
+}
+
+/* ───────── 슬롯 ───────── */
+function renderSlots() {
+  const grid = document.getElementById('slotsGrid');
+  grid.innerHTML = '';
+  slots.forEach((s, i) => {
+    const card = document.createElement('div');
+    card.className = 'slot' + (s ? ' active' : '');
+    card.id = `slot${i}`;
+    card.innerHTML = `
+      <div class="slot-top">
+        <span class="led" id="led${i}"></span>
+        <span class="slot-num">SLOT ${i+1}</span>
+      </div>
+      <div class="slot-content ${s ? 'filled' : ''}">${s ? s.name : '비어있음'}</div>
+      ${s ? `
+        <div class="slot-actions">
+          <button class="slot-btn play-btn" onclick="playSlot(${i})">▶ 재생</button>
+          <button class="slot-btn clear-btn" onclick="clearSlot(${i})">✕ 제거</button>
+        </div>
+      ` : `
+        <button class="slot-assign" onclick="assignSlot(${i})">+ 선택한 소리 배치</button>
+      `}
+    `;
+    grid.appendChild(card);
+  });
+}
+
+function assignSlot(i) {
+  if (selectedIdx < 0) { alert('먼저 목록에서 소리를 선택하세요'); return; }
+  slots[i] = { ...sounds[selectedIdx], idx: selectedIdx };
+  renderSlots();
+  log(`슬롯 ${i+1} ← ${sounds[selectedIdx].name}`, 'ok');
+}
+
+function clearSlot(i) {
+  slots[i] = null;
+  updateLEDUI(i, false);
+  renderSlots();
+}
+
+function playSlot(i) {
+  if (!slots[i]) return;
+  const audio = new Audio(slots[i].url);
+  audio.volume = volume / 100;
+  playingAudios.add(audio);
+  audio.play();
+
+  updateLEDUI(i, true);
+  audio.onended = () => { playingAudios.delete(audio); updateLEDUI(i, false); };
+
+  sendBLE(`PLAY:${i+1}:${Math.round(volume)}`);
+  log(`재생: 슬롯 ${i+1} "${slots[i].name}"`, 'ok');
+}
+
+function updateLEDUI(idx, on) {
+  const led = document.getElementById(`led${idx}`);
+  if (led) led.classList.toggle('on', on);
+  const slot = document.getElementById(`slot${idx}`);
+  if (slot) slot.classList.toggle('playing', on);
+}
+
+/* ───────── 볼륨 ───────── */
+function setVolume(val, source) {
+  volume = parseInt(val);
+  document.getElementById('volNum').textContent = volume + '%';
+  document.getElementById('volSlider').value = volume;
+  document.getElementById('volSrc').textContent = source;
+  /* 재생 중인 오디오에 즉시 반영 */
+  for (const a of playingAudios) {
+    a.volume = volume / 100;
+  }
+}
+
+/* ───────── 키보드 단축키 ───────── */
+document.addEventListener('keydown', e => {
+  if (['1','2','3','4'].includes(e.key)) playSlot(parseInt(e.key) - 1);
+  if (e.key === 'r' || e.key === 'R') toggleRecord();
+});
+
+/* ───────── 초기화 ───────── */
+renderSlots();
+log('Beatbox Maker 준비됨. BLE로 nRF52840 DK에 연결하세요.');
+</script>
+</body>
+</html>

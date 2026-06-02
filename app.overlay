@@ -1,0 +1,50 @@
+/ {
+    aliases {
+        qdec0 = &qdec0;
+    };
+
+    zephyr,user {
+        io-channels = <&adc 1>, <&adc 2>;
+    };
+};
+
+&pinctrl {
+    qdec0_default: qdec0_default {
+        group1 {
+            psels = <NRF_PSEL(QDEC_A, 1, 4)>,   /* Arduino D3 = P1.04 */
+                    <NRF_PSEL(QDEC_B, 1, 3)>;   /* Arduino D2 = P1.03 */
+        };
+    };
+};
+
+&qdec0 {
+    status = "okay";
+    pinctrl-0 = <&qdec0_default>;
+    pinctrl-names = "default";
+    led-pre = <0>;
+    steps = <20>;
+};
+
+&adc {
+    status = "okay";
+    #address-cells = <1>;
+    #size-cells = <0>;
+
+    channel@1 {
+        reg = <1>;
+        zephyr,gain = "ADC_GAIN_1_4";
+        zephyr,reference = "ADC_REF_VDD_1_4";
+        zephyr,acquisition-time = <ADC_ACQ_TIME_DEFAULT>;
+        zephyr,input-positive = <NRF_SAADC_AIN1>;
+        zephyr,resolution = <12>;
+    };
+
+    channel@2 {
+        reg = <2>;
+        zephyr,gain = "ADC_GAIN_1_4";
+        zephyr,reference = "ADC_REF_VDD_1_4";
+        zephyr,acquisition-time = <ADC_ACQ_TIME_DEFAULT>;
+        zephyr,input-positive = <NRF_SAADC_AIN2>;
+        zephyr,resolution = <12>;
+    };
+};
